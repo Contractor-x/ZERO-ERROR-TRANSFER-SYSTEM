@@ -1,0 +1,114 @@
+import os
+import zlib
+
+# Hamming code functions
+def calc_parity(bits, parity_pos):
+    """ Calculate parity bit for a given position using Hamming Code (parity bits). """
+    check_bits = []
+    for i in range(1, len(bits) + 1):
+        if i & parity_pos == parity_pos:
+            check_bits.append(bits[i - 1])
+    return sum(check_bits) % 2
+
+def hamming_encode(data_bits):
+    """ Encode data using Hamming Code (7,4). """
+    n = len(data_bits)
+    r = 0
+    while 2 ** r < n + r + 1:
+        r += 1
+
+    encoded_bits = ['0'] * (n + r)
+    j = 0
+    for i in range(n + r):
+        if (i + 1) & (i) == 0:  # Position is a parity bit position
+            continue
+        encoded_bits[i] = data_bits[j]
+        j += 1
+
+    for i in range(r):
+        parity_pos = 2 ** i
+        parity_val = calc_parity(encoded_bits, parity_pos)
+        encoded_bits[parity_pos - 1] = str(parity_val)
+    
+    return ''.join(encoded_bits)
+
+def hamming_decode(bits):
+    """ Decode the Hamming Code and correct single-bit errors if any. """
+    n = len(bits)
+    r = 0
+    while 2 ** r < n + 1:
+        r += 1
+
+    error_pos = 0
+    for i in range(r):
+        parity_pos = 2 ** i
+        parity_val = calc_parity(bits, parity_pos)
+        if parity_val != int(bits[parity_pos - 1]):
+            error_pos += parity_pos
+
+    if error_pos != 0:
+        print(f"Error detected at position: {error_pos}. Correcting it.")
+        bits = list(bits)
+        bits[error_pos - 1] = '1' if bits[error_pos - 1] == '0' else '0'
+        bits = ''.join(bits)
+    
+    decoded_bits = []
+    j = 0
+    for i in range(n):
+        if (i + 1) & (i) == 0:  # Skip parity bits
+            continue
+        decoded_bits.append(bits[j])
+        j += 1
+    
+    return ''.join(decoded_bits)
+
+# Function to convert file to raw bits
+def file_to_bits(file_path):
+    with open(file_path, "rb") as file:
+        file_bytes = file.read()
+    bits = ''.join(f'{byte:08b}' for byte in file_bytes)
+    return bits
+
+# Function to send bits through a fast medium (simulated with zlib compression)
+def send_bits(bits):
+    # Compressing the bits before transmission (simulating speed)
+    compressed = zlib.compress(bits.encode())
+    return compressed
+
+# Function to recompile bits into the original file
+def bits_to_file(bits, output_path):
+    byte_array = bytearray()
+    for i in range(0, len(bits), 8):
+        byte_array.append(int(bits[i:i+8], 2))
+    
+    with open(output_path, "wb") as file:
+        file.write(byte_array)
+
+# Main function demonstrating the process
+def main(input_file_path, output_file_path):
+    print(f"Converting file '{input_file_path}' to bits...")
+    bits = file_to_bits(input_file_path)
+
+    # Step 1: Encode the file bits with Hamming Code (error correction)
+    print("Encoding bits with Hamming Code (error correction)...")
+    encoded_bits = hamming_encode(bits)
+
+    # Step 2: Simulate sending bits through a fast medium (compression and potential errors)
+    print("Simulating transmission of bits through a fast medium...")
+    transmitted_bits = send_bits(encoded_bits)
+
+    # Step 3: Simulate receiving the bits, decompress and detect/correct errors
+    decompressed_bits = zlib.decompress(transmitted_bits).decode()
+    print("Detecting and correcting errors (if any)...")
+    corrected_bits = hamming_decode(decompressed_bits)
+
+    # Step 4: Recompile the corrected bits into the original file
+    print(f"Recompiling bits into the file '{output_file_path}'...")
+    bits_to_file(corrected_bits, output_file_path)
+
+    print("Recompilation complete.")
+
+if __name__ == "__main__":
+    input_file = "example.txt"  # Specify your input file here
+    output_file = "recompiled_example.txt"  # Specify your output file here
+    main(input_file, output_file)
